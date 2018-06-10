@@ -2,6 +2,8 @@
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System;
+using System.Collections.Generic;
+using System.Threading;
 
 namespace AStarProject
 {
@@ -10,14 +12,8 @@ namespace AStarProject
     /// </summary>
     public class Game1 : Game
     {
-
-        GraphicsDeviceManager graphics;
-        SpriteBatch spriteBatch;
-        int gridSize;
-        int tileSize;
-        Tile[] allTiles;
-
-        struct TileTextures
+        #region CUSTOM STRUCT and ENUMS
+        private struct TileTextures
         {
             public Texture2D white;
             public Texture2D black;
@@ -33,10 +29,10 @@ namespace AStarProject
             {
                 if (randomizer == null)
                     randomizer = new Random();
-                
-                int output = randomizer.Next(0,9);
 
-                if(output <= 7)
+                int output = randomizer.Next(0, 9);
+
+                if (output <= 7)
                 {
                     return white;
                 }
@@ -44,42 +40,40 @@ namespace AStarProject
                 return black;
             }
         }
-        //Make an instance to store all tile textures
-        TileTextures tileTextures;
-        
+        private enum GameStatus
+        {
+            StartTileSelection,
+            EndTileSelection,
+            Running,
+            Finished
+        }
+        #endregion
+
+        #region Private Simple Variables
+        private GraphicsDeviceManager graphics;
+        private SpriteBatch spriteBatch;
+        private int gridSize;
+        private int tileSize;
+        private Tile[] allTiles;
+        #endregion
+
+        #region CLASS, STRUCT and ENUM Instances
+        private TileTextures tileTextures;
+        private GameStatus gameState;
+        #endregion
+
+        //Some inits are within the game constructor
         public Game1()
         {
             tileTextures = new TileTextures();
             graphics = new GraphicsDeviceManager(this);
             Content.RootDirectory = "Content";
+            graphics.PreferredBackBufferHeight = 700;
+            graphics.PreferredBackBufferWidth = 700;
         }
 
-        /// <summary>
-        /// Allows the game to perform any initialization it needs to before starting to run.
-        /// This is where it can query for any required services and load any non-graphic
-        /// related content.  Calling base.Initialize will enumerate through any components
-        /// and initialize them as well.
-        /// </summary>
-        protected override void Initialize()
-        {
-            // TODO: Add your initialization logic here
-            base.Initialize();
-            //Make sure to set the viewport to be equal in size
-            SetViewPort();
-            gridSize = GraphicsDevice.Viewport.Width;
-            tileSize = 20;
-
-            GenerateTiles(out allTiles, (gridSize / tileSize) * (gridSize / tileSize), gridSize / tileSize, tileSize);
-
-        }
-
-        private void SetViewPort()
-        {
-            var viewport = GraphicsDevice.Viewport;
-            viewport.Height = viewport.Width;
-            GraphicsDevice.Viewport = viewport;
-        }
-        private void GenerateTiles(out Tile[] tiles, int arraySize, int xyArraySize,int pTileSize)
+        //Generate a randomized tile set (Does not check for blocked off areas)
+        private void GenerateTiles(out Tile[] tiles, int arraySize, int xyArraySize, int pTileSize)
         {
             tiles = new Tile[arraySize];
 
@@ -90,6 +84,34 @@ namespace AStarProject
                     tiles[(x * xyArraySize) + y] = new Tile(tileTextures.TextureRandomizer(), pTileSize, pTileSize, x * pTileSize, y * pTileSize);
                 }
             }
+        }
+
+        //A* Algorithm
+        private List<Tile> AStar(Tile startingNode, Tile endNode)
+        {
+
+            return null;
+        }
+
+        /// <summary>
+        /// Allows the game to perform any initialization it needs to before starting to run.
+        /// This is where it can query for any required services and load any non-graphic
+        /// related content.  Calling base.Initialize will enumerate through any components
+        /// and initialize them as well.
+        /// </summary>
+        protected override void Initialize()
+        {
+            base.Initialize();
+            this.IsMouseVisible = true;
+
+            gridSize = GraphicsDevice.Viewport.Width;
+            tileSize = 20;
+
+            //Initialize game status
+            gameState = GameStatus.StartTileSelection;
+
+            //Full Tile Generation
+            GenerateTiles(out allTiles, (gridSize / tileSize) * (gridSize / tileSize), gridSize / tileSize, tileSize);
         }
 
         /// <summary>
@@ -106,19 +128,8 @@ namespace AStarProject
             tileTextures.red = Content.Load<Texture2D>("sprites/endTile");
             tileTextures.yellow = Content.Load<Texture2D>("sprites/yellowTile");
 
-            
             // Create a new SpriteBatch, which can be used to draw textures.
             spriteBatch = new SpriteBatch(GraphicsDevice);
-            // TODO: use this.Content to load your game content here
-        }
-
-        /// <summary>
-        /// UnloadContent will be called once per game and is the place to unload
-        /// game-specific content.
-        /// </summary>
-        protected override void UnloadContent()
-        {
-            // TODO: Unload any non ContentManager content here
         }
 
         /// <summary>
@@ -130,9 +141,77 @@ namespace AStarProject
         {
             if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
                 Exit();
-            
-            // TODO: Add your update logic here
 
+            //this will run as long as you haven't made the 2 selection points
+            if (gameState == GameStatus.StartTileSelection || gameState == GameStatus.EndTileSelection)
+            {
+                MouseState ms2 = Mouse.GetState();
+                if (!GraphicsDevice.Viewport.Bounds.Contains(ms2.Position))
+                    return;
+                else
+                {
+                    MouseState ms = Mouse.GetState();
+                    Tile foundCell = null;
+                    Rectangle mouseSelectionPosition = new Rectangle(ms.Position, new Point(1, 1));
+                    foreach (var cell in allTiles)
+                    {
+                        if (cell.Rectangle.Contains(mouseSelectionPosition) && cell.IsWalkable)
+                        {
+                            foundCell = cell;
+                            if(gameState == GameStatus.StartTileSelection && !foundCell.IsEnd && !foundCell.IsStart)
+                            {
+                                foundCell.TextureStatus = tileTextures.darkBlue;
+                            }
+                            else if(gameState == GameStatus.EndTileSelection && !foundCell.IsEnd && !foundCell.IsStart)
+                            {
+                                foundCell.TextureStatus = tileTextures.red;
+                            }
+                            
+                        }
+                        else
+                        {
+                            if (cell.IsWalkable && !cell.IsEnd && !cell.IsStart)
+                                cell.TextureStatus = tileTextures.white;
+                            else if(!cell.IsEnd && !cell.IsStart)
+                                cell.TextureStatus = tileTextures.black;
+                        }
+                    }
+                    if (ms.LeftButton == ButtonState.Pressed)
+                    {
+
+                        if (gameState == GameStatus.StartTileSelection)
+                        {
+                            foundCell.TextureStatus = tileTextures.darkBlue;
+                            foundCell.IsStart = true;
+                            gameState = GameStatus.EndTileSelection;
+                            Thread.Sleep(500);
+                        }
+                        else if (gameState == GameStatus.EndTileSelection)
+                        {
+                            foundCell.TextureStatus = tileTextures.red;
+                            gameState = GameStatus.Running;
+                            foundCell.IsEnd = true;
+                            Thread.Sleep(500);
+                            Tile startTile = null;
+                            foreach (var tile in allTiles)
+                            {
+                                if (tile.IsStart)
+                                    startTile = tile;
+                            }
+                            //Now that both beginning and end are set -> the algorthing can do its job;
+                            if (startTile != null)
+                                AStar(startTile, foundCell);
+                        }
+                        else
+                        {
+                            throw new Exception("A none existen state has been passed into the box selection, please check your input");
+                        }
+
+                            
+                        
+                    }
+                }
+            }
             base.Update(gameTime);
         }
 
@@ -146,12 +225,9 @@ namespace AStarProject
             spriteBatch.Begin();
             foreach (var tile in allTiles)
             {
-                spriteBatch.Draw(tile.TextureStatus,tile.Rectangle,Color.White);
+                spriteBatch.Draw(tile.TextureStatus, tile.Rectangle, Color.White);
             }
             spriteBatch.End();
-
-           
-            // TODO: Add your drawing code here
 
             base.Draw(gameTime);
         }
