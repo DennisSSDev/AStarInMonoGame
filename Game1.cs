@@ -1,6 +1,7 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using System;
 
 namespace AStarProject
 {
@@ -9,11 +10,46 @@ namespace AStarProject
     /// </summary>
     public class Game1 : Game
     {
+
         GraphicsDeviceManager graphics;
         SpriteBatch spriteBatch;
+        int gridSize;
+        int tileSize;
+        Tile[] allTiles;
 
+        struct TileTextures
+        {
+            public Texture2D white;
+            public Texture2D black;
+            public Texture2D green;
+            public Texture2D lightBlue;
+            public Texture2D yellow;
+            public Texture2D red;
+            public Texture2D darkBlue;
+
+            private Random randomizer;
+
+            public Texture2D TextureRandomizer()
+            {
+                if (randomizer == null)
+                    randomizer = new Random();
+                
+                int output = randomizer.Next(0,9);
+
+                if(output <= 7)
+                {
+                    return white;
+                }
+
+                return black;
+            }
+        }
+        //Make an instance to store all tile textures
+        TileTextures tileTextures;
+        
         public Game1()
         {
+            tileTextures = new TileTextures();
             graphics = new GraphicsDeviceManager(this);
             Content.RootDirectory = "Content";
         }
@@ -27,8 +63,33 @@ namespace AStarProject
         protected override void Initialize()
         {
             // TODO: Add your initialization logic here
-
             base.Initialize();
+            //Make sure to set the viewport to be equal in size
+            SetViewPort();
+            gridSize = GraphicsDevice.Viewport.Width;
+            tileSize = 20;
+
+            GenerateTiles(out allTiles, (gridSize / tileSize) * (gridSize / tileSize), gridSize / tileSize, tileSize);
+
+        }
+
+        private void SetViewPort()
+        {
+            var viewport = GraphicsDevice.Viewport;
+            viewport.Height = viewport.Width;
+            GraphicsDevice.Viewport = viewport;
+        }
+        private void GenerateTiles(out Tile[] tiles, int arraySize, int xyArraySize,int pTileSize)
+        {
+            tiles = new Tile[arraySize];
+
+            for (int x = 0; x < xyArraySize; x++)
+            {
+                for (int y = 0; y < xyArraySize; y++)
+                {
+                    tiles[(x * xyArraySize) + y] = new Tile(tileTextures.TextureRandomizer(), pTileSize, pTileSize, x * pTileSize, y * pTileSize);
+                }
+            }
         }
 
         /// <summary>
@@ -37,9 +98,17 @@ namespace AStarProject
         /// </summary>
         protected override void LoadContent()
         {
+            tileTextures.white = Content.Load<Texture2D>("sprites/whiteTile");
+            tileTextures.black = Content.Load<Texture2D>("sprites/blackTile");
+            tileTextures.darkBlue = Content.Load<Texture2D>("sprites/startTile");
+            tileTextures.green = Content.Load<Texture2D>("sprites/greenTile");
+            tileTextures.lightBlue = Content.Load<Texture2D>("sprites/lightBlueTile");
+            tileTextures.red = Content.Load<Texture2D>("sprites/endTile");
+            tileTextures.yellow = Content.Load<Texture2D>("sprites/yellowTile");
+
+            
             // Create a new SpriteBatch, which can be used to draw textures.
             spriteBatch = new SpriteBatch(GraphicsDevice);
-
             // TODO: use this.Content to load your game content here
         }
 
@@ -61,7 +130,7 @@ namespace AStarProject
         {
             if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
                 Exit();
-
+            
             // TODO: Add your update logic here
 
             base.Update(gameTime);
@@ -74,7 +143,14 @@ namespace AStarProject
         protected override void Draw(GameTime gameTime)
         {
             GraphicsDevice.Clear(Color.CornflowerBlue);
+            spriteBatch.Begin();
+            foreach (var tile in allTiles)
+            {
+                spriteBatch.Draw(tile.TextureStatus,tile.Rectangle,Color.White);
+            }
+            spriteBatch.End();
 
+           
             // TODO: Add your drawing code here
 
             base.Draw(gameTime);
